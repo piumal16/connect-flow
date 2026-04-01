@@ -13,9 +13,7 @@ const Customer = sequelize.define('Customer', {
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
 }, {
   tableName: 'customers',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
+  timestamps: false,
 });
 
 module.exports = Customer;

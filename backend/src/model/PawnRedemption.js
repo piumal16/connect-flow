@@ -19,9 +19,7 @@ const PawnRedemption = sequelize.define('PawnRedemption', {
   notes: { type: DataTypes.STRING(1000) },
 }, {
   tableName: 'pawn_redemptions',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: false,
+  timestamps: false,
 });
 
 module.exports = PawnRedemption;

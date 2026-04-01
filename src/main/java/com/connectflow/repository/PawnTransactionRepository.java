@@ -55,8 +55,8 @@ public interface PawnTransactionRepository extends JpaRepository<PawnTransaction
     // Advanced search with optional filters and optional branch scope (via customer relationship)
     @Query("SELECT p FROM PawnTransaction p WHERE " +
            "(:branchId IS NULL OR p.branchId = :branchId) AND " +
-           "(:pawnId IS NULL OR LOWER(p.pawnId) LIKE LOWER(CONCAT('%', :pawnId, '%'))) AND " +
-           "(:customerNic IS NULL OR LOWER(p.customer.nic) LIKE LOWER(CONCAT('%', :customerNic, '%'))) AND " +
+           "(:pawnId IS NULL OR LOWER(p.pawnId) LIKE LOWER(CONCAT('%', CAST(:pawnId AS string), '%'))) AND " +
+           "(:customerNic IS NULL OR LOWER(p.customer.nic) LIKE LOWER(CONCAT('%', CAST(:customerNic AS string), '%'))) AND " +
            "(:status IS NULL OR p.status = :status) AND " +
            "(:minAmount IS NULL OR p.loanAmount >= :minAmount) AND " +
            "(:maxAmount IS NULL OR p.loanAmount <= :maxAmount) AND " +

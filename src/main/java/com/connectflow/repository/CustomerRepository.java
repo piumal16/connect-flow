@@ -32,10 +32,10 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
      * All parameters are optional - only applied if not null
      */
     @Query("SELECT c FROM Customer c WHERE " +
-           "(:nic IS NULL OR LOWER(c.nic) LIKE LOWER(CONCAT('%', :nic, '%'))) AND " +
-           "(:phone IS NULL OR LOWER(c.phone) LIKE LOWER(CONCAT('%', :phone, '%'))) AND " +
-           "(:name IS NULL OR LOWER(c.fullName) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
-           "(:customerType IS NULL OR LOWER(c.customerType) = LOWER(:customerType)) AND " +
+           "(:nic IS NULL OR LOWER(c.nic) LIKE LOWER(CONCAT('%', CAST(:nic AS string), '%'))) AND " +
+           "(:phone IS NULL OR LOWER(c.phone) LIKE LOWER(CONCAT('%', CAST(:phone AS string), '%'))) AND " +
+           "(:name IS NULL OR LOWER(c.fullName) LIKE LOWER(CONCAT('%', CAST(:name AS string), '%'))) AND " +
+           "(:customerType IS NULL OR LOWER(c.customerType) = LOWER(CAST(:customerType AS string))) AND " +
            "(:isActive IS NULL OR c.isActive = :isActive)")
     Page<Customer> searchAdvanced(
             @Param("nic") String nic,
@@ -50,8 +50,8 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
      * All parameters are optional - only applied if not null
      */
     @Query("SELECT c FROM Customer c WHERE " +
-           "(:nic IS NULL OR LOWER(c.nic) LIKE LOWER(CONCAT('%', :nic, '%'))) AND " +
-           "(:phone IS NULL OR LOWER(c.phone) LIKE LOWER(CONCAT('%', :phone, '%'))) AND " +
+           "(:nic IS NULL OR LOWER(c.nic) LIKE LOWER(CONCAT('%', CAST(:nic AS string), '%'))) AND " +
+           "(:phone IS NULL OR LOWER(c.phone) LIKE LOWER(CONCAT('%', CAST(:phone AS string), '%'))) AND " +
            "(:isActive IS NULL OR c.isActive = :isActive)")
     Page<Customer> filterCustomers(
             @Param("nic") String nic,

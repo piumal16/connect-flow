@@ -11,9 +11,7 @@ const InterestRate = sequelize.define('InterestRate', {
   isDefault: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_default' },
 }, {
   tableName: 'interest_rates',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
+  timestamps: false,
 });
 
 module.exports = InterestRate;

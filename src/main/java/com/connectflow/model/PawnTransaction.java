@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -106,10 +107,16 @@ public class PawnTransaction {
         if (pawnDate == null) {
             pawnDate = LocalDate.now();
         }
+        if (firstMonthInterestRatePercent == null && interestRatePercent != null) {
+            firstMonthInterestRatePercent = interestRatePercent.divide(new BigDecimal("12"), 2, RoundingMode.HALF_UP);
+        }
     }
 
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+        if (firstMonthInterestRatePercent == null && interestRatePercent != null) {
+            firstMonthInterestRatePercent = interestRatePercent.divide(new BigDecimal("12"), 2, RoundingMode.HALF_UP);
+        }
     }
 }

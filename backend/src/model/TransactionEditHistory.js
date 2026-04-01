@@ -20,9 +20,7 @@ const TransactionEditHistory = sequelize.define('TransactionEditHistory', {
   editReason: { type: DataTypes.TEXT, field: 'edit_reason' },
 }, {
   tableName: 'transaction_edit_history',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: false,
+  timestamps: false,
 });
 
 module.exports = TransactionEditHistory;

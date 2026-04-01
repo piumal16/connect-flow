@@ -37,7 +37,7 @@ public class PawnTransactionItemImage {
     @Column(name = "transaction_id", nullable = false, columnDefinition = "CHAR(36)")
     private UUID transactionId;
 
-    @Column(name = "image_url", nullable = false, columnDefinition = "LONGTEXT")
+    @Column(name = "image_url", nullable = false, columnDefinition = "TEXT")
     private String imageUrl; // Base64 encoded image or file path
 
     @Column(name = "image_order")

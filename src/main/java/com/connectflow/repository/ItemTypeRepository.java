@@ -42,8 +42,8 @@ public interface ItemTypeRepository extends JpaRepository<ItemType, UUID> {
      * Uses LIKE for case-insensitive partial matching on name
      */
     @Query("SELECT DISTINCT it FROM ItemType it WHERE " +
-           "(:name IS NULL OR LOWER(it.name) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
-           "(:description IS NULL OR LOWER(it.description) LIKE LOWER(CONCAT('%', :description, '%'))) AND " +
+           "(:name IS NULL OR LOWER(it.name) LIKE LOWER(CONCAT('%', CAST(:name AS string), '%'))) AND " +
+           "(:description IS NULL OR LOWER(it.description) LIKE LOWER(CONCAT('%', CAST(:description AS string), '%'))) AND " +
            "(:isActive IS NULL OR it.isActive = :isActive)")
     Page<ItemType> advancedSearch(
             @Param("name") String name,

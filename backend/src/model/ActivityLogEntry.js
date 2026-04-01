@@ -10,9 +10,7 @@ const ActivityLogEntry = sequelize.define('ActivityLogEntry', {
   metadata: { type: DataTypes.TEXT('long') },
 }, {
   tableName: 'activity_log_entries',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: false,
+  timestamps: false,
 });
 
 module.exports = ActivityLogEntry;

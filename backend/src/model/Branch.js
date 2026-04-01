@@ -11,9 +11,7 @@ const Branch = sequelize.define('Branch', {
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
 }, {
   tableName: 'branches',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
+  timestamps: false,
 });
 
 module.exports = Branch;

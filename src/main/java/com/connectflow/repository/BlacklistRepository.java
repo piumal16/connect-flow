@@ -29,8 +29,8 @@ public interface BlacklistRepository extends JpaRepository<Blacklist, UUID> {
      * Follows the same pattern as CustomerRepository.filterCustomers()
      */
     @Query("SELECT b FROM Blacklist b WHERE " +
-           "(:nic IS NULL OR LOWER(b.customerNic) LIKE LOWER(CONCAT('%', :nic, '%'))) AND " +
-           "(:policeReport IS NULL OR LOWER(b.policeReportNumber) LIKE LOWER(CONCAT('%', :policeReport, '%'))) AND " +
+           "(:nic IS NULL OR LOWER(b.customerNic) LIKE LOWER(CONCAT('%', CAST(:nic AS string), '%'))) AND " +
+           "(:policeReport IS NULL OR LOWER(b.policeReportNumber) LIKE LOWER(CONCAT('%', CAST(:policeReport AS string), '%'))) AND " +
            "(:isActive IS NULL OR b.isActive = :isActive)")
     Page<Blacklist> filterBlacklist(
             @Param("nic") String nic,

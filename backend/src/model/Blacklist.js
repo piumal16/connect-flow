@@ -14,9 +14,7 @@ const Blacklist = sequelize.define('Blacklist', {
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
 }, {
   tableName: 'blacklist',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: false,
+  timestamps: false,
 });
 
 module.exports = Blacklist;

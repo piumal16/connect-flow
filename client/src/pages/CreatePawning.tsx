@@ -51,6 +51,8 @@ export default function CreatePawning() {
   const [appraisedValue, setAppraisedValue] = useState("");
   const [marketValue, setMarketValue] = useState("");
   const [currentItemImages, setCurrentItemImages] = useState<string[]>([]);
+  // Tracks how many image uploads are in-flight
+  const [uploadingImageCount, setUploadingImageCount] = useState(0);
 
   interface ItemDetail {
     description: string;
@@ -273,6 +275,15 @@ export default function CreatePawning() {
 
   // Step 2: Add item
   const handleAddItem = () => {
+    if (uploadingImageCount > 0) {
+      toast({
+        title: "Please Wait",
+        description: "Images are still uploading. Please wait before adding the item.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const newErrors: Record<string, string> = {};
 
     if (!itemWeight || parseFloat(itemWeight) <= 0) {
@@ -312,6 +323,7 @@ export default function CreatePawning() {
     setAppraisedValue("");
     setMarketValue("");
     setCurrentItemImages([]);
+    setUploadingImageCount(0);
     setErrors({});
 
     toast({
@@ -337,17 +349,32 @@ export default function CreatePawning() {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCurrentItemImages((prev) => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
+    // Reset input so the same file can be re-selected after removal
+    e.target.value = "";
+
+    setUploadingImageCount((prev) => prev + files.length);
+
+    for (const file of files) {
+      try {
+        const result = await apiClient.images.upload(file, "pending");
+        if (result.success && result.url) {
+          setCurrentItemImages((prev) => [...prev, result.url]);
+        }
+      } catch (error: any) {
+        console.error("Image upload failed:", error);
+        toast({
+          title: "Image Upload Failed",
+          description: `Could not upload "${file.name}": ${error.message}`,
+          variant: "destructive",
+        });
+      } finally {
+        setUploadingImageCount((prev) => Math.max(0, prev - 1));
+      }
+    }
   };
 
   const removeImage = (index: number) => {
@@ -560,6 +587,7 @@ export default function CreatePawning() {
     setCustomerPhone("");
     setItems([]);
     setCurrentItemImages([]);
+    setUploadingImageCount(0);
     setLoanAmount("");
     setSelectedRateId("");
     setRemarks("");
@@ -929,14 +957,24 @@ export default function CreatePawning() {
                   <ImageIcon className="h-4 w-4" />
                   Item Images (Optional)
                 </Label>
-                <div className="flex gap-3">
+                <div className="flex gap-3 items-center">
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={uploadingImageCount > 0}
                     onClick={() => document.getElementById('image-upload')?.click()}
                   >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Images
+                    {uploadingImageCount > 0 ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Uploading {uploadingImageCount} image{uploadingImageCount > 1 ? 's' : ''}…
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Images
+                      </>
+                    )}
                     <input
                       id="image-upload"
                       type="file"
@@ -947,16 +985,16 @@ export default function CreatePawning() {
                     />
                   </Button>
                   <span className="text-sm text-muted-foreground py-2">
-                    {currentItemImages.length} image(s)
+                    {currentItemImages.length} image(s) ready
                   </span>
                 </div>
 
                 {currentItemImages.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {currentItemImages.map((preview, index) => (
+                    {currentItemImages.map((url, index) => (
                       <div key={index} className="relative group">
                         <img
-                          src={preview}
+                          src={url}
                           alt={`Preview ${index + 1}`}
                           className="w-full h-24 object-cover rounded border"
                         />
@@ -974,7 +1012,7 @@ export default function CreatePawning() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleAddItem} className="gap-2">
+                <Button onClick={handleAddItem} className="gap-2" disabled={uploadingImageCount > 0}>
                   <Plus className="h-4 w-4" />
                   Add Item
                 </Button>

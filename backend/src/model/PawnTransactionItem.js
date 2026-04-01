@@ -15,9 +15,7 @@ const PawnTransactionItem = sequelize.define('PawnTransactionItem', {
   itemOrder: { type: DataTypes.INTEGER, field: 'item_order' },
 }, {
   tableName: 'pawn_transaction_items',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
+  timestamps: false,
 });
 
 module.exports = PawnTransactionItem;

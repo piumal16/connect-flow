@@ -12,8 +12,8 @@ import java.util.UUID;
 public interface ActivityLogRepository extends JpaRepository<ActivityLogEntry, UUID> {
 
     @Query("SELECT a FROM ActivityLogEntry a WHERE " +
-           "(:userName IS NULL OR LOWER(a.userName) LIKE LOWER(CONCAT('%', :userName, '%'))) AND " +
-           "(:action   IS NULL OR LOWER(a.action)   LIKE LOWER(CONCAT('%', :action,   '%'))) " +
+           "(:userName IS NULL OR LOWER(a.userName) LIKE LOWER(CONCAT('%', CAST(:userName AS string), '%'))) AND " +
+           "(:action   IS NULL OR LOWER(a.action)   LIKE LOWER(CONCAT('%', CAST(:action AS string),   '%'))) " +
            "ORDER BY a.createdAt DESC")
     Page<ActivityLogEntry> search(
             @Param("userName") String userName,

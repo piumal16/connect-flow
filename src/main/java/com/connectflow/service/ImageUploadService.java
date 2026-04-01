@@ -1,64 +1,60 @@
 package com.connectflow.service;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ImageUploadService {
 
-    @Value("${app.upload.dir:./uploads/pawn-transactions}")
-    private String uploadDir;
+    private final Cloudinary cloudinary;
 
     /**
-     * Upload a single image file
+     * Upload a single image file to Cloudinary.
+     *
+     * @param file          the image file
+     * @param transactionId folder name inside "pawn-transactions/" on Cloudinary
+     * @return the secure Cloudinary URL
      */
+    @SuppressWarnings("unchecked")
     public String uploadImage(MultipartFile file, String transactionId) throws IOException {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File is empty");
         }
 
-        // Validate file type
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new IllegalArgumentException("File must be an image");
         }
 
-        // Create directory if it doesn't exist
-        Path uploadPath = Paths.get(uploadDir);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-            log.info("Created upload directory: {}", uploadPath);
-        }
+        String folder = "pawn-transactions/" + (transactionId != null && !transactionId.isBlank()
+                ? transactionId : "pending");
 
-        // Generate unique filename
-        String originalFilename = file.getOriginalFilename();
-        String fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        String filename = transactionId + "_" + UUID.randomUUID() + fileExtension;
+        Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                file.getBytes(),
+                ObjectUtils.asMap(
+                        "folder", folder,
+                        "resource_type", "image"
+                )
+        );
 
-        // Save file
-        Path filePath = uploadPath.resolve(filename);
-        Files.write(filePath, file.getBytes());
-        log.info("Uploaded image: {} to {}", filename, filePath);
-
-        // Return file path/URL
-        return "/uploads/pawn-transactions/" + filename;
+        String url = (String) uploadResult.get("secure_url");
+        log.info("✅ Uploaded image to Cloudinary: {}", url);
+        return url;
     }
 
     /**
-     * Upload multiple images
+     * Upload multiple image files to Cloudinary.
      */
     public List<String> uploadImages(List<MultipartFile> files, String transactionId) throws IOException {
         List<String> uploadedUrls = new ArrayList<>();
@@ -70,30 +66,52 @@ public class ImageUploadService {
     }
 
     /**
-     * Delete an image file
+     * Delete an image from Cloudinary by its URL.
+     * Falls back to a no-op for old local-path URLs.
      */
+    @SuppressWarnings("unchecked")
     public void deleteImage(String imageUrl) {
-        if (imageUrl == null || !imageUrl.startsWith("/uploads/")) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return;
+        }
+
+        // Old local path – nothing to delete from Cloudinary
+        if (!imageUrl.contains("cloudinary.com")) {
+            log.warn("Skipping delete for non-Cloudinary URL: {}", imageUrl);
             return;
         }
 
         try {
-            String filename = imageUrl.substring(imageUrl.lastIndexOf("/") + 1);
-            Path filePath = Paths.get(uploadDir).resolve(filename);
-            if (Files.exists(filePath)) {
-                Files.delete(filePath);
-                log.info("Deleted image: {}", filename);
-            }
-        } catch (IOException e) {
-            log.error("Failed to delete image: {}", imageUrl, e);
+            String publicId = extractPublicId(imageUrl);
+            cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+            log.info("✅ Deleted image from Cloudinary: {}", publicId);
+        } catch (Exception e) {
+            log.error("Failed to delete image from Cloudinary: {}", imageUrl, e);
         }
     }
 
     /**
-     * Get upload directory
+     * Extract the Cloudinary public_id from a secure URL.
+     * Example URL: https://res.cloudinary.com/cloud/image/upload/v123/pawn-transactions/txId/filename.jpg
+     * → public_id: pawn-transactions/txId/filename
      */
+    private String extractPublicId(String url) {
+        // Everything after "/upload/" (strip version segment if present)
+        int uploadIdx = url.indexOf("/upload/");
+        if (uploadIdx == -1) return url;
+
+        String path = url.substring(uploadIdx + 8); // skip "/upload/"
+        // Remove version prefix "v1234567890/"
+        if (path.matches("v\\d+/.*")) {
+            path = path.substring(path.indexOf('/') + 1);
+        }
+        // Remove file extension
+        int dotIdx = path.lastIndexOf('.');
+        return dotIdx > 0 ? path.substring(0, dotIdx) : path;
+    }
+
+    /** For backward-compatibility with the test endpoint. */
     public String getUploadDir() {
-        return uploadDir;
+        return "cloudinary";
     }
 }
-

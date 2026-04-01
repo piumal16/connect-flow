@@ -10,9 +10,7 @@ const ItemType = sequelize.define('ItemType', {
   createdBy: { type: DataTypes.CHAR(36), field: 'created_by' },
 }, {
   tableName: 'item_types',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
+  timestamps: false,
 });
 
 module.exports = ItemType;

@@ -10,9 +10,7 @@ const PawnTransactionItemImage = sequelize.define('PawnTransactionItemImage', {
   imageOrder: { type: DataTypes.INTEGER, field: 'image_order' },
 }, {
   tableName: 'pawn_transaction_item_images',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: false,
+  timestamps: false,
 });
 
 module.exports = PawnTransactionItemImage;

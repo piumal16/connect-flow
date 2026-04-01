@@ -26,6 +26,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +46,22 @@ public class DataInitializer implements CommandLineRunner {
     private final PawnTransactionRepository pawnTransactionRepository;
     private final PawnTransactionItemRepository pawnTransactionItemRepository;
     private final PawnTransactionItemImageRepository pawnTransactionItemImageRepository;
+
+    private BigDecimal resolveFirstMonthRate(BigDecimal transactionRatePercent, InterestRate linkedRate) {
+        if (linkedRate != null
+            && linkedRate.getRatePercent() != null
+            && transactionRatePercent != null
+            && linkedRate.getRatePercent().compareTo(transactionRatePercent) == 0
+            && linkedRate.getFirstMonthRatePercent() != null) {
+            return linkedRate.getFirstMonthRatePercent();
+        }
+
+        if (transactionRatePercent == null) {
+            return new BigDecimal("0.00");
+        }
+
+        return transactionRatePercent.divide(new BigDecimal("12"), 2, RoundingMode.HALF_UP);
+    }
 
     @Override
     public void run(String... args) {
@@ -439,6 +456,7 @@ public class DataInitializer implements CommandLineRunner {
             InterestRate rate2 = allRates.size() > 1 ? allRates.get(1) : rate1;
 
             // Transaction 1 - Active
+            BigDecimal txn1RatePercent = rate1 != null ? rate1.getRatePercent() : new BigDecimal("8.50");
             PawnTransaction txn1 = pawnTransactionRepository.save(PawnTransaction.builder()
                 .pawnId("PW0001")
                 .branchId(mainBranch.getId())
@@ -449,7 +467,8 @@ public class DataInitializer implements CommandLineRunner {
                 .loanAmount(new BigDecimal("100000"))
                 .remainingBalance(new BigDecimal("100000"))
                 .interestRateId(rate1 != null ? rate1.getId() : null)
-                .interestRatePercent(rate1 != null ? rate1.getRatePercent() : new BigDecimal("8.50"))
+                .interestRatePercent(txn1RatePercent)
+                .firstMonthInterestRatePercent(resolveFirstMonthRate(txn1RatePercent, rate1))
                 .periodMonths(6)
                 .pawnDate(LocalDate.now().minusDays(10))
                 .maturityDate(LocalDate.now().plusMonths(6).minusDays(10))
@@ -485,6 +504,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build());
 
             // Transaction 2 - Active
+            BigDecimal txn2RatePercent = new BigDecimal("7.00");
             PawnTransaction txn2 = pawnTransactionRepository.save(PawnTransaction.builder()
                 .pawnId("PW0002")
                 .branchId(mainBranch.getId())
@@ -495,7 +515,8 @@ public class DataInitializer implements CommandLineRunner {
                 .loanAmount(new BigDecimal("220000"))
                 .remainingBalance(new BigDecimal("220000"))
                 .interestRateId(rate1 != null ? rate1.getId() : null)
-                .interestRatePercent(new BigDecimal("7.00"))
+                .interestRatePercent(txn2RatePercent)
+                .firstMonthInterestRatePercent(resolveFirstMonthRate(txn2RatePercent, rate1))
                 .periodMonths(6)
                 .pawnDate(LocalDate.now().minusDays(5))
                 .maturityDate(LocalDate.now().plusMonths(6).minusDays(5))
@@ -524,6 +545,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build());
 
             // Transaction 3 - Active (East Branch) - Multiple Items
+            BigDecimal txn3RatePercent = rate2 != null ? rate2.getRatePercent() : new BigDecimal("10.00");
             PawnTransaction txn3 = pawnTransactionRepository.save(PawnTransaction.builder()
                 .pawnId("PW0003")
                 .branchId(eastBranch.getId())
@@ -534,7 +556,8 @@ public class DataInitializer implements CommandLineRunner {
                 .loanAmount(new BigDecimal("280000"))
                 .remainingBalance(new BigDecimal("280000"))
                 .interestRateId(rate2 != null ? rate2.getId() : null)
-                .interestRatePercent(rate2 != null ? rate2.getRatePercent() : new BigDecimal("10.00"))
+                .interestRatePercent(txn3RatePercent)
+                .firstMonthInterestRatePercent(resolveFirstMonthRate(txn3RatePercent, rate2))
                 .periodMonths(12)
                 .pawnDate(LocalDate.now().minusDays(15))
                 .maturityDate(LocalDate.now().plusMonths(12).minusDays(15))
@@ -582,6 +605,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build());
 
             // Transaction 4 - Completed
+            BigDecimal txn4RatePercent = new BigDecimal("8.50");
             PawnTransaction txn4 = pawnTransactionRepository.save(PawnTransaction.builder()
                 .pawnId("PW0004")
                 .branchId(mainBranch.getId())
@@ -592,7 +616,8 @@ public class DataInitializer implements CommandLineRunner {
                 .loanAmount(new BigDecimal("45000"))
                 .remainingBalance(new BigDecimal("0"))
                 .interestRateId(rate1 != null ? rate1.getId() : null)
-                .interestRatePercent(new BigDecimal("8.50"))
+                .interestRatePercent(txn4RatePercent)
+                .firstMonthInterestRatePercent(resolveFirstMonthRate(txn4RatePercent, rate1))
                 .periodMonths(6)
                 .pawnDate(LocalDate.now().minusMonths(7))
                 .maturityDate(LocalDate.now().minusMonths(1))
@@ -621,6 +646,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build());
 
             // Transaction 5 - Active
+            BigDecimal txn5RatePercent = new BigDecimal("7.50");
             PawnTransaction txn5 = pawnTransactionRepository.save(PawnTransaction.builder()
                 .pawnId("PW0005")
                 .branchId(eastBranch.getId())
@@ -631,7 +657,8 @@ public class DataInitializer implements CommandLineRunner {
                 .loanAmount(new BigDecimal("130000"))
                 .remainingBalance(new BigDecimal("130000"))
                 .interestRateId(rate1 != null ? rate1.getId() : null)
-                .interestRatePercent(new BigDecimal("7.50"))
+                .interestRatePercent(txn5RatePercent)
+                .firstMonthInterestRatePercent(resolveFirstMonthRate(txn5RatePercent, rate1))
                 .periodMonths(6)
                 .pawnDate(LocalDate.now().minusDays(2))
                 .maturityDate(LocalDate.now().plusMonths(6).minusDays(2))

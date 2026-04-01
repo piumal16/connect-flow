@@ -620,9 +620,28 @@ export const apiClient = {
   },
 
   /**
-   * Image Upload API
+   * Image Upload API (backed by Cloudinary via Spring Boot backend)
    */
   images: {
+    /**
+     * Upload a single image.  Alias used by CreatePawning.
+     * Returns { success, url, filename, size }
+     */
+    upload: async (file: File, transactionId: string = 'pending'): Promise<{ success: boolean; url: string; filename: string; size: number }> => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('transactionId', transactionId);
+      const response = await authFetch(`${API_BASE_URL}/images/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const err: { error?: string } = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to upload image');
+      }
+      return response.json();
+    },
+
     uploadSingle: async (file: File, transactionId: string) => {
       const formData = new FormData();
       formData.append('file', file);

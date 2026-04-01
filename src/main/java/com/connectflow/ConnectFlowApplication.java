@@ -32,4 +32,3 @@ public class ConnectFlowApplication {
         return new CorsFilter(source);
     }
 }
-

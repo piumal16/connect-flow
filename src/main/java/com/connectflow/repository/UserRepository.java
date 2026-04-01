@@ -23,8 +23,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * Note: Role and branchId are stored in user_roles table, so we join with it
      */
     @Query("SELECT DISTINCT u FROM User u LEFT JOIN UserRole ur ON u.id = ur.userId WHERE " +
-           "(:name IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
-           "(:email IS NULL OR LOWER(u.email) LIKE LOWER(CONCAT('%', :email, '%'))) AND " +
+           "(:name IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', CAST(:name AS string), '%'))) AND " +
+           "(:email IS NULL OR LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:email AS string), '%'))) AND " +
            "(:role IS NULL OR ur.role = :role) AND " +
            "(:branchId IS NULL OR ur.branchId = :branchId)")
     Page<User> filterUsers(

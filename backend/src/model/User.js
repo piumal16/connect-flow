@@ -11,9 +11,7 @@ const User = sequelize.define('User', {
   password: { type: DataTypes.STRING(255), allowNull: false },
 }, {
   tableName: 'profiles',
-  timestamps: true,
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
+  timestamps: false,
 });
 
 module.exports = User;
