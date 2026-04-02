@@ -122,6 +122,13 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <!-- Keeps CI/CD -Pproduction invocations valid without changing build behavior. -->
+        <profile>
+            <id>production</id>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
 
