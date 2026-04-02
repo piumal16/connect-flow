@@ -50,3 +50,4 @@ uploads/
 # Database
 *.db
 *.sqlite
+node_modules
