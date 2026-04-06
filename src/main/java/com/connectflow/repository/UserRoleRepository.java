@@ -13,5 +13,6 @@ public interface UserRoleRepository extends JpaRepository<UserRole, UUID> {
     Optional<UserRole> findByUserIdAndRole(UUID userId, UserRole.Role role);
     List<UserRole> findByBranchId(UUID branchId);
     List<UserRole> findByRole(UserRole.Role role);
+    long countByRole(UserRole.Role role);
 }
 

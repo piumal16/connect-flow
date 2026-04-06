@@ -226,6 +226,17 @@ public class PawnTransactionController {
         } catch (IllegalArgumentException e) {
             log.error("Validation error: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
+        } catch (RuntimeException e) {
+            // Catch image upload failures and other runtime errors
+            if (e.getMessage() != null && e.getMessage().contains("Image upload failed")) {
+                log.error("Image upload error during transaction creation: {}", e.getMessage(), e);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(null); // Return error; client should parse error body or use exception handler
+            } else if (e.getMessage() != null && e.getMessage().contains("Cloudinary")) {
+                log.error("Cloudinary error during transaction creation: {}", e.getMessage(), e);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            }
+            throw e;
         }
     }
 

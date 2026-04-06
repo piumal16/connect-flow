@@ -38,7 +38,7 @@ public class PawnTransactionItemImage {
     private UUID transactionId;
 
     @Column(name = "image_url", nullable = false, columnDefinition = "TEXT")
-    private String imageUrl; // Base64 encoded image or file path
+    private String imageUrl; // Cloudinary secure URL (never Base64 after migration)
 
     @Column(name = "image_order")
     private Integer imageOrder = 0; // Order of image for this item

@@ -55,6 +55,7 @@ public class PawnTransactionService {
     private final PawnTransactionItemRepository itemRepository;
     private final PawnTransactionItemImageRepository itemImageRepository;
     private final TransactionEditHistoryRepository editHistoryRepository;
+    private final ImageUploadService imageUploadService;
 
     /**
      * Get all transactions
@@ -383,7 +384,9 @@ public class PawnTransactionService {
     }
 
     /**
-     * Save transaction items and their images
+     * Save transaction items and their images.
+     * IMPORTANT: Images that are not already Cloudinary URLs will be uploaded to Cloudinary.
+     * If any image upload fails, the entire transaction creation fails (fail-fast semantics).
      */
     private void saveTransactionItems(UUID transactionId, List<ItemDetailDTO> itemsDTO) {
         for (int i = 0; i < itemsDTO.size(); i++) {
@@ -405,13 +408,35 @@ public class PawnTransactionService {
             PawnTransactionItem savedItem = itemRepository.save(item);
             log.info("Saved item {} with ID: {}", i + 1, savedItem.getId());
 
-            // Save images for this item
+            // Save images for this item - FAIL FAST if any upload fails
             if (itemDTO.getImages() != null && !itemDTO.getImages().isEmpty()) {
                 for (int j = 0; j < itemDTO.getImages().size(); j++) {
+                    String imageInput = itemDTO.getImages().get(j);
+                    String finalImageUrl = imageInput;
+
+                    // If image is Base64 or not a Cloudinary URL, upload it now
+                    if (!imageUploadService.isCloudinaryUrl(imageInput)) {
+                        try {
+                            log.info("Image {} for item {} is not a Cloudinary URL. Uploading to Cloudinary...", j + 1, i + 1);
+                            if (imageInput.startsWith("data:") || !imageInput.startsWith("http")) {
+                                // It's Base64 or a local path - upload it
+                                finalImageUrl = imageUploadService.uploadBase64Image(imageInput, transactionId.toString());
+                                log.info("✅ Image {} for item {} uploaded to Cloudinary: {}", j + 1, i + 1, finalImageUrl);
+                            }
+                        } catch (Exception e) {
+                            // FAIL FAST - propagate the exception to abort transaction
+                            log.error("❌ FAILED to upload image {} for item {}: {}", j + 1, i + 1, e.getMessage(), e);
+                            throw new RuntimeException(
+                                    String.format("Image upload failed for item %d, image %d: %s", i + 1, j + 1, e.getMessage()),
+                                    e
+                            );
+                        }
+                    }
+
                     PawnTransactionItemImage image = PawnTransactionItemImage.builder()
                             .itemId(savedItem.getId())
                             .transactionId(transactionId)
-                            .imageUrl(itemDTO.getImages().get(j))
+                            .imageUrl(finalImageUrl)
                             .imageOrder(j)
                             .build();
                     itemImageRepository.save(image);

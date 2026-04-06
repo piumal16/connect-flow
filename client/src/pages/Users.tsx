@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import apiClient from "@/integrations/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { CreateUserDialog } from "@/components/users/CreateUserDialog";
 import { PinManagementDialog } from "@/components/users/PinManagementDialog";
 import { AdvancedSearchPanel, type FilterValue } from "@/components/ui/AdvancedSearchPanel";
@@ -29,6 +30,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [selectedUserForPin, setSelectedUserForPin] = useState<User | null>(null);
@@ -47,6 +49,7 @@ export default function UsersPage() {
 
   const fetchUsers = useCallback(async (name?: string | null, email?: string | null, roleFilter?: string | null, branch?: string | null) => {
     try {
+      setLoading(true);
       // Use filter API if any filters are provided, otherwise use paginated API
       const hasFilters = name || email || roleFilter || branch;
 
@@ -66,6 +69,8 @@ export default function UsersPage() {
       setTotalElements(response.totalElements as number);
     } catch (error) {
       console.error("Failed to fetch users:", error);
+    } finally {
+      setLoading(false);
     }
   }, [currentPage, pageSize]);
 
@@ -97,71 +102,77 @@ export default function UsersPage() {
   const hasActiveFilters = filterName !== "" || filterEmail !== "" || filterRole.length > 0 || filterBranch !== "";
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">User Management</h1>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter className="mr-2 h-4 w-4" />
-            Filters
-            {hasActiveFilters && (
-              <Badge variant="secondary" className="ml-2 bg-slate-600 text-white">
-                {[filterName, filterEmail, filterRole.length > 0 ? "role" : "", filterBranch].filter(Boolean).length}
-              </Badge>
+    <>
+      <LoadingOverlay isLoading={loading} message="Loading users..." />
+
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">User Management</h1>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              disabled={loading}
+            >
+              <Filter className="mr-2 h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="ml-2 bg-slate-600 text-white">
+                  {[filterName, filterEmail, filterRole.length > 0 ? "role" : "", filterBranch].filter(Boolean).length}
+                </Badge>
+              )}
+            </Button>
+            {(role === "SUPERADMIN" || role === "ADMIN") && (
+              <Button onClick={() => setShowCreate(true)} disabled={loading}>
+                <UserPlus className="mr-2 h-4 w-4" /> Create User
+              </Button>
             )}
-          </Button>
-          {(role === "SUPERADMIN" || role === "ADMIN") && (
-            <Button onClick={() => setShowCreate(true)}><UserPlus className="mr-2 h-4 w-4" /> Create User</Button>
-          )}
+          </div>
         </div>
-      </div>
 
-      {/* Filter Panel using AdvancedSearchPanel */}
-      {showFilters && (
-        <AdvancedSearchPanel
-          title="User Filters"
-          subtitle="Search users by name, email, role, or branch"
-          inputFields={[
-            {
-              name: "name",
-              label: "Name",
-              placeholder: "Enter name...",
-            },
-            {
-              name: "email",
-              label: "Email",
-              placeholder: "Enter email...",
-            },
-            {
-              name: "branch",
-              label: "Branch",
-              placeholder: "Enter branch name...",
-            },
-          ]}
-          checkboxGroups={[
-            {
-              name: "role",
-              label: "Role",
-              options: [
-                { label: "Superadmin", value: "SUPERADMIN" },
-                { label: "Admin", value: "ADMIN" },
-                { label: "Manager", value: "MANAGER" },
-                { label: "Staff", value: "STAFF" },
-              ],
-            },
-          ]}
-          onSearch={handleSearch}
-          isLoading={false}
-          backgroundColor="bg-gray-100"
-        />
-      )}
+        {/* Filter Panel using AdvancedSearchPanel */}
+        {showFilters && (
+          <AdvancedSearchPanel
+            title="User Filters"
+            subtitle="Search users by name, email, role, or branch"
+            inputFields={[
+              {
+                name: "name",
+                label: "Name",
+                placeholder: "Enter name...",
+              },
+              {
+                name: "email",
+                label: "Email",
+                placeholder: "Enter email...",
+              },
+              {
+                name: "branch",
+                label: "Branch",
+                placeholder: "Enter branch name...",
+              },
+            ]}
+            checkboxGroups={[
+              {
+                name: "role",
+                label: "Role",
+                options: [
+                  { label: "Superadmin", value: "SUPERADMIN" },
+                  { label: "Admin", value: "ADMIN" },
+                  { label: "Manager", value: "MANAGER" },
+                  { label: "Staff", value: "STAFF" },
+                ],
+              },
+            ]}
+            onSearch={handleSearch}
+            isLoading={loading}
+            backgroundColor="bg-gray-100"
+          />
+        )}
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
@@ -207,7 +218,7 @@ export default function UsersPage() {
                 </TableRow>
               ))}
               {users.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">{loading ? "Loading users..." : "No users found"}</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -218,13 +229,15 @@ export default function UsersPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
-            Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalElements)} of {totalElements} users
+            {totalElements > 0
+              ? `Showing ${currentPage * pageSize + 1} to ${Math.min((currentPage + 1) * pageSize, totalElements)} of ${totalElements} users`
+              : `Showing 0 of ${totalElements} users`}
           </span>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Label className="text-sm">Rows per page:</Label>
-            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(0); }}>
+            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(0); }} disabled={loading}>
               <SelectTrigger className="w-20">
                 <SelectValue />
               </SelectTrigger>
@@ -241,7 +254,7 @@ export default function UsersPage() {
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-              disabled={currentPage === 0}
+              disabled={loading || currentPage === 0}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -252,7 +265,7 @@ export default function UsersPage() {
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={currentPage >= totalPages - 1}
+              disabled={loading || currentPage >= totalPages - 1}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -260,17 +273,18 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <CreateUserDialog open={showCreate} onOpenChange={(open) => { setShowCreate(open); if (!open) fetchUsers(); }} />
+        <CreateUserDialog open={showCreate} onOpenChange={(open) => { setShowCreate(open); if (!open) fetchUsers(); }} />
 
-      {selectedUserForPin && (
-        <PinManagementDialog
-          userId={selectedUserForPin.id}
-          userName={selectedUserForPin.full_name}
-          open={showPinDialog}
-          onOpenChange={setShowPinDialog}
-          onSuccess={() => fetchUsers()}
-        />
-      )}
-    </div>
+        {selectedUserForPin && (
+          <PinManagementDialog
+            userId={selectedUserForPin.id}
+            userName={selectedUserForPin.full_name}
+            open={showPinDialog}
+            onOpenChange={setShowPinDialog}
+            onSuccess={() => fetchUsers()}
+          />
+        )}
+      </div>
+    </>
   );
 }

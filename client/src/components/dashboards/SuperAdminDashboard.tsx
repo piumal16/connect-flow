@@ -14,16 +14,12 @@ export function SuperAdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [branches, users] = await Promise.all([
-          apiClient.branches.getAll(),
-          apiClient.users.getAll(),
-        ]);
-        const activeBranches = branches.filter((b: any) => (b.isActive ?? b.is_active) === true).length;
+        const response = await apiClient.users.getSuperAdminDashboardStats();
         setStats({
-          totalBranches: branches.length || 0,
-          pendingRequests: 0,
-          totalUsers: users.length || 0,
-          activeBranches,
+          totalBranches: response.totalBranches || 0,
+          pendingRequests: response.pendingRequests || 0,
+          totalUsers: response.totalUsers || 0,
+          activeBranches: response.activeBranches || 0,
         });
       } catch (error) {
         setStats({ totalBranches: 0, pendingRequests: 0, totalUsers: 0, activeBranches: 0 });

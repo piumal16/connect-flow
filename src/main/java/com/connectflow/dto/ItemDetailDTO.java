@@ -22,5 +22,5 @@ public class ItemDetailDTO {
     private BigDecimal marketValue; // New field: market/replacement value
 
     @Builder.Default
-    private List<String> images = new ArrayList<>(); // Image URLs/base64 strings
+    private List<String> images = new ArrayList<>(); // Base64 data URIs or Cloudinary URLs; backend uploads Base64 to Cloudinary during transaction creation
 }

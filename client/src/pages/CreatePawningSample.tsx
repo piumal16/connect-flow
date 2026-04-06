@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import apiClient from "@/integrations/api";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
-import { Image as ImageIcon, Upload, X } from "lucide-react";
+import { Camera, Image as ImageIcon, Upload, X } from "lucide-react";
+import { compressImageFile, compressImageDataUri } from "@/utils/imageUtils";
 
 
 type IdType = "NIC" | "Passport" | "DrivingLicense";
@@ -128,6 +129,12 @@ export default function CreatePawningSample() {
   const skipNextAutoSearchRef = useRef(false);
   const selectedNicRef = useRef<string | null>(null);
 
+  // Camera state
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [showCameraDialog, setShowCameraDialog] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
   const totals = useMemo(
     () =>
       items.reduce(
@@ -177,10 +184,10 @@ export default function CreatePawningSample() {
       setItemTypes(data || []);
 
       if (data && data.length > 0) {
-        toast({
-          title: "Item Types Loaded",
-          description: `${data.length} item types loaded from database`,
-        });
+        // toast({
+        //   title: "Item Types Loaded",
+        //   description: `${data.length} item types loaded from database`,
+        // });
       }
     } catch (error: unknown) {
       console.error("❌ Failed to fetch item types:", error);
@@ -198,6 +205,14 @@ export default function CreatePawningSample() {
     fetchItemTypes();
     fetchPatternConfig();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraStream]);
 
   useEffect(() => {
     // Skip reset when identity is changed by selecting from dropdown
@@ -425,18 +440,67 @@ export default function CreatePawningSample() {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setItemDraft((prev) => ({ ...prev, images: [...prev.images, reader.result as string] }));
-      };
-      reader.readAsDataURL(file);
-    });
-  };
+    for (const file of files) {
+      compressImageFile(file, 1024, 0.8)
+        .then((compressed) => {
+          setItemDraft((prev) => ({ ...prev, images: [...prev.images, compressed] }));
+          toast({ title: "Image Added", description: `"${file.name}" compressed and added` });
+        })
+        .catch(() => {
+          toast({ title: "Error", description: `Failed to process "${file.name}"`, variant: "destructive" });
+        });
+    }
+    // Reset so the same file can be re-selected
+    e.target.value = "";
+  }, [toast]);
+
+  const stopCamera = useCallback(() => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((t) => t.stop());
+      setCameraStream(null);
+    }
+  }, [cameraStream]);
+
+  const openCamera = useCallback(async () => {
+    setCameraError(null);
+    setShowCameraDialog(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      });
+      setCameraStream(stream);
+      setTimeout(() => {
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      }, 100);
+    } catch (err: unknown) {
+      setCameraError(err instanceof Error ? err.message : "Camera access denied");
+    }
+  }, []);
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    compressImageDataUri(canvas.toDataURL("image/jpeg", 1.0), 1024, 0.8)
+      .then((compressed) => {
+        setItemDraft((prev) => ({ ...prev, images: [...prev.images, compressed] }));
+        toast({ title: "Photo Captured", description: "Photo compressed and added to item" });
+        stopCamera();
+        setShowCameraDialog(false);
+      })
+      .catch(() => {
+        toast({ title: "Error", description: "Failed to process captured photo", variant: "destructive" });
+      });
+  }, [stopCamera, toast]);
 
   const removeDraftImage = (index: number) => {
     setItemDraft((prev) => ({
@@ -656,35 +720,33 @@ export default function CreatePawningSample() {
       }
 
       const firstItem = items[0];
-      const allImages = items.flatMap((item) => item.images);
 
-       const transactionData = {
-         customerName,
-         customerNic: identityNumber.trim(),
-         idType,
-         gender,
-         customerAddress,
-         customerPhone,
-         customerType: "Regular",
-         itemDescription: items.length > 1 ? `Multiple items (${items.length})` : firstItem.description,
-         itemContent: firstItem.content,
-         itemCondition: firstItem.condition,
-         itemWeightGrams: totals.weight,
-         itemKarat: firstItem.karat,
-         appraisedValue: totals.appraised,
-         loanAmount: parseFloat(loanAmount || "0"),
-         interestRateId: selectedRateId,
-         interestRatePercent: effectiveRatePercent,
-         firstMonthInterestRatePercent: firstMonthRatePercent,
-         rateOverride: rateOverrideEnabled,
-         periodMonths: parseInt(periodMonths, 10),
-         patternMode: patternUnlocked ? "B" : "A",
-         pawnDate,
-         maturityDate: maturityDateStr,
-         remarks,
-         imageUrls: allImages,
-         items,
-       };
+        const transactionData = {
+          customerName,
+          customerNic: identityNumber.trim(),
+          idType,
+          gender,
+          customerAddress,
+          customerPhone,
+          customerType: "Regular",
+          itemDescription: items.length > 1 ? `Multiple items (${items.length})` : firstItem.description,
+          itemContent: firstItem.content,
+          itemCondition: firstItem.condition,
+          itemWeightGrams: totals.weight,
+          itemKarat: firstItem.karat,
+          appraisedValue: totals.appraised,
+          loanAmount: parseFloat(loanAmount || "0"),
+          interestRateId: selectedRateId,
+          interestRatePercent: effectiveRatePercent,
+          firstMonthInterestRatePercent: firstMonthRatePercent,
+          rateOverride: rateOverrideEnabled,
+          periodMonths: parseInt(periodMonths, 10),
+          patternMode: patternUnlocked ? "B" : "A",
+          pawnDate,
+          maturityDate: maturityDateStr,
+          remarks,
+          items,
+        };
 
       const response = await apiClient.pawnTransactions.create(transactionData);
 
@@ -922,7 +984,7 @@ export default function CreatePawningSample() {
 
                     <div className="space-y-1">
                       <Label className="text-xs flex items-center gap-1"><ImageIcon className="h-3 w-3" />Current Item Images</Label>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Button
                           type="button"
                           variant="outline"
@@ -932,6 +994,15 @@ export default function CreatePawningSample() {
                         >
                           <Upload className="h-3 w-3 mr-1" />Upload
                           <input id="image-upload-sample" type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={openCamera}
+                          className="h-7 text-xs"
+                        >
+                          <Camera className="h-3 w-3 mr-1" />Camera
                         </Button>
                         <span className="text-xs text-muted-foreground">{itemDraft.images.length} image(s)</span>
                       </div>
@@ -1199,7 +1270,42 @@ export default function CreatePawningSample() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Camera Dialog */}
+      <Dialog open={showCameraDialog} onOpenChange={(open) => { if (!open) { stopCamera(); setShowCameraDialog(false); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Camera className="h-4 w-4" />Capture Photo</DialogTitle>
+            <DialogDescription>Position the item and press Capture to take a photo.</DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center gap-4 py-2">
+            {cameraError ? (
+              <div className="w-full rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700 text-center">
+                <p className="font-semibold mb-1">Camera unavailable</p>
+                <p>{cameraError}</p>
+                <p className="mt-2 text-xs text-muted-foreground">Check browser permissions and try again.</p>
+              </div>
+            ) : (
+              <div className="w-full rounded-lg overflow-hidden bg-black border">
+                <video ref={videoRef} autoPlay playsInline muted className="w-full max-h-72 object-cover" />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { stopCamera(); setShowCameraDialog(false); }}>Cancel</Button>
+            {!cameraError && (
+              <Button onClick={capturePhoto} className="gap-2">
+                <Camera className="h-4 w-4" />Capture Photo
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+
+
 

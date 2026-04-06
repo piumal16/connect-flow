@@ -1,9 +1,11 @@
 package com.connectflow.controller;
 
 import com.connectflow.aop.ActivityLog;
+import com.connectflow.dto.AdminDashboardStatsDTO;
 import com.connectflow.dto.CreateUserRequest;
 import com.connectflow.dto.PageResponse;
 import com.connectflow.dto.SetPinRequest;
+import com.connectflow.dto.SuperAdminDashboardStatsDTO;
 import com.connectflow.dto.UserDTO;
 import com.connectflow.dto.VerifyPinRequest;
 import com.connectflow.model.UserRole;
@@ -14,8 +16,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -94,6 +99,42 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
+    @GetMapping("/dashboard-stats/admin")
+    @Operation(summary = "Get admin dashboard stats")
+    public ResponseEntity<?> getAdminDashboardStats() {
+        Optional<UserDTO> currentUser = getAuthenticatedUser();
+        if (currentUser.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        UserRole.Role role = currentUser.get().getRole();
+        if (role != UserRole.Role.ADMIN && role != UserRole.Role.SUPERADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Only Admin and Super Admin can view admin dashboard stats"));
+        }
+
+        AdminDashboardStatsDTO response = userService.getAdminDashboardStats();
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/dashboard-stats/super-admin")
+    @Operation(summary = "Get super admin dashboard stats")
+    public ResponseEntity<?> getSuperAdminDashboardStats() {
+        Optional<UserDTO> currentUser = getAuthenticatedUser();
+        if (currentUser.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        UserRole.Role role = currentUser.get().getRole();
+        if (role != UserRole.Role.SUPERADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Only Super Admin can view super admin dashboard stats"));
+        }
+
+        SuperAdminDashboardStatsDTO response = userService.getSuperAdminDashboardStats();
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping
     @Operation(summary = "Create a new user (will be inserted into PROFILES table)")
     @ActivityLog(action = "CREATE_USER", description = "Created new user")
@@ -165,6 +206,14 @@ public class UserController {
         Optional<UserDTO> user = userService.getUserById(id);
         return user.map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private Optional<UserDTO> getAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return Optional.empty();
+        }
+        return userService.getUserByEmail(authentication.getPrincipal().toString());
     }
 }
 

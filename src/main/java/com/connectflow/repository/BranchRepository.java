@@ -10,5 +10,6 @@ import java.util.UUID;
 public interface BranchRepository extends JpaRepository<Branch, UUID> {
     List<Branch> findByIsActiveTrueOrderByName();
     List<Branch> findByManagerId(UUID managerId);
+    long countByIsActiveTrue();
 }
 

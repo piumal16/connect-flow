@@ -1,13 +1,17 @@
 package com.connectflow.service;
 
 import com.connectflow.dto.CreateUserRequest;
+import com.connectflow.dto.AdminDashboardStatsDTO;
 import com.connectflow.dto.PageResponse;
+import com.connectflow.dto.SuperAdminDashboardStatsDTO;
 import com.connectflow.dto.UserDTO;
 import com.connectflow.model.User;
 import com.connectflow.model.UserRole;
 import com.connectflow.repository.UserRepository;
 import com.connectflow.repository.UserRoleRepository;
 import com.connectflow.repository.BranchRepository;
+import com.connectflow.repository.PawnTransactionRepository;
+import com.connectflow.repository.InterestRateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -30,6 +34,26 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
     private final BranchRepository branchRepository;
+    private final PawnTransactionRepository pawnTransactionRepository;
+    private final InterestRateRepository interestRateRepository;
+
+    public AdminDashboardStatsDTO getAdminDashboardStats() {
+        return AdminDashboardStatsDTO.builder()
+                .managers(userRoleRepository.countByRole(UserRole.Role.MANAGER))
+                .totalStaff(userRoleRepository.countByRole(UserRole.Role.STAFF))
+                .activePawns(pawnTransactionRepository.countByStatus("Active"))
+                .activeRates(interestRateRepository.countByIsActiveTrue())
+                .build();
+    }
+
+    public SuperAdminDashboardStatsDTO getSuperAdminDashboardStats() {
+        return SuperAdminDashboardStatsDTO.builder()
+                .totalBranches(branchRepository.count())
+                .pendingRequests(0L)
+                .totalUsers(userRepository.count())
+                .activeBranches(branchRepository.countByIsActiveTrue())
+                .build();
+    }
 
     /**
      * Get user by ID

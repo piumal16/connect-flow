@@ -28,6 +28,7 @@ public interface PawnTransactionRepository extends JpaRepository<PawnTransaction
     // Find by status
     List<PawnTransaction> findByStatus(String status);
     Page<PawnTransaction> findByStatus(String status, Pageable pageable);
+    long countByStatus(String status);
 
     // Find by branch and status
     Page<PawnTransaction> findByBranchIdAndStatus(UUID branchId, String status, Pageable pageable);

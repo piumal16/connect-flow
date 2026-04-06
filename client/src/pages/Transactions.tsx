@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import apiClient from "@/integrations/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Plus, Edit, X, Image as ImageIcon, ChevronLeft, ChevronRight, Info, DollarSign, TrendingUp, Filter } from "lucide-react";
+import { Plus, Edit, X, Camera, Image as ImageIcon, ChevronLeft, ChevronRight, Info, DollarSign, TrendingUp, Filter } from "lucide-react";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { AdvancedSearchPanel, type FilterValue } from "@/components/ui/AdvancedSearchPanel";
+import { compressImageDataUri, compressImageFile } from "@/utils/imageUtils";
 
 export default function Transactions() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,10 +77,13 @@ export default function Transactions() {
   const [selectedRateId, setSelectedRateId] = useState("");
   const [periodMonths, setPeriodMonths] = useState("12");
   const [remarks, setRemarks] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState<any[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [uploadingImages, setUploadingImages] = useState(false);
+   const [loading, setLoading] = useState(false);
+   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [showCameraDialog, setShowCameraDialog] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Redemption state
   const [showRedemptionDialog, setShowRedemptionDialog] = useState(false);
@@ -193,6 +197,14 @@ export default function Transactions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, pageSize, appliedFilters, categoryFilter]);
 
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
   // TND Pattern detection for unlocking category B
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -287,7 +299,8 @@ export default function Transactions() {
       maturityDate.setMonth(maturityDate.getMonth() + parseInt(periodMonths));
       const maturityDateStr = maturityDate.toISOString().split('T')[0];
 
-      // Prepare transaction data
+      // Prepare transaction data — images are embedded in the items array.
+      // Backend uploads Base64 images to Cloudinary during transaction creation.
       const transactionData = {
         customerName,
         customerNic,
@@ -295,23 +308,26 @@ export default function Transactions() {
         gender,
         customerAddress,
         customerPhone,
-        customerType: "Regular", // Default customer type
-        patternMode: categoryFilter, // Store pattern mode (A or ALL)
-        itemDescription: fullItemDescription,
-        itemTypeId: selectedItemTypeId, // Store item type ID if backend supports it
-        itemContent,
-        itemCondition,
-        itemWeightGrams: itemWeight ? parseFloat(itemWeight) : 0,
-        itemKarat: parseInt(itemKarat),
-        appraisedValue: appraisedValue ? parseFloat(appraisedValue) : 0,
+        customerType: "Regular",
+        patternMode: categoryFilter,
         loanAmount: parseFloat(loanAmount),
         interestRateId: selectedRateId,
-        interestRatePercent: selectedRate.rate_percent || selectedRate.ratePercent, // Get percent from selected rate
+        interestRatePercent: selectedRate.rate_percent || selectedRate.ratePercent,
         periodMonths: parseInt(periodMonths),
-        pawnDate, // Today's date
-        maturityDate: maturityDateStr, // Calculated maturity date
+        pawnDate,
+        maturityDate: maturityDateStr,
         remarks,
-        imageUrls: imagePreviews, // Base64 encoded images
+        items: [
+          {
+            description: fullItemDescription,
+            content: itemContent,
+            condition: itemCondition,
+            weightGrams: itemWeight ? parseFloat(itemWeight) : 0,
+            karat: itemKarat,
+            appraisedValue: appraisedValue ? parseFloat(appraisedValue) : 0,
+            images: imagePreviews, // Base64 data URIs — backend uploads to Cloudinary
+          },
+        ],
       };
 
       // Call API to create transaction
@@ -339,9 +355,8 @@ export default function Transactions() {
       setLoanAmount("");
       setSelectedRateId("");
       setPeriodMonths("6");
-      setRemarks("");
-      setUploadedImages([]);
-      setImagePreviews([]);
+       setRemarks("");
+        setImagePreviews([]);
 
       // Close dialog and refresh transactions
       setShowCreate(false);
@@ -358,43 +373,88 @@ export default function Transactions() {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    try {
-      setUploadingImages(true);
-
-      // Create previews
-      files.forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreviews((prev) => [...prev, reader.result as string]);
-        };
-        reader.readAsDataURL(file);
-      });
-
-      // Store files for later upload
-      setUploadedImages((prev) => [...prev, ...files]);
-
-      toast({
-        title: "Images selected",
-        description: `${files.length} image(s) selected. They will be uploaded when you create the transaction.`,
-      });
-    } catch (error: any) {
-      console.error("Error processing images:", error);
-      toast({
-        title: "Error",
-        description: "Failed to process images",
-        variant: "destructive",
-      });
-    } finally {
-      setUploadingImages(false);
+    for (const file of files) {
+      compressImageFile(file, 1024, 0.8)
+        .then((compressed) => {
+          setImagePreviews((prev) => [...prev, compressed]);
+          toast({
+            title: "Image Added",
+            description: `"${file.name}" compressed and added`,
+          });
+        })
+        .catch(() => {
+          toast({
+            title: "Error",
+            description: `Failed to process "${file.name}"`,
+            variant: "destructive",
+          });
+        });
     }
-  };
+    e.target.value = "";
+  }, [toast]);
+
+  const stopCamera = useCallback(() => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+  }, [cameraStream]);
+
+  const openCamera = useCallback(async () => {
+    setCameraError(null);
+    setShowCameraDialog(true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      });
+      setCameraStream(stream);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch (error: unknown) {
+      setCameraError(error instanceof Error ? error.message : "Camera access denied");
+    }
+  }, []);
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    compressImageDataUri(canvas.toDataURL("image/jpeg", 1.0), 1024, 0.8)
+      .then((compressed) => {
+        setImagePreviews((prev) => [...prev, compressed]);
+        toast({
+          title: "Photo Captured",
+          description: "Photo compressed and added to transaction",
+        });
+        stopCamera();
+        setShowCameraDialog(false);
+      })
+      .catch(() => {
+        toast({
+          title: "Error",
+          description: "Failed to process captured photo",
+          variant: "destructive",
+        });
+      });
+  }, [stopCamera, toast]);
 
   const removeImage = (index: number) => {
-    setUploadedImages((prev) => prev.filter((_, i) => i !== index));
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -783,7 +843,16 @@ export default function Transactions() {
         </CardContent>
       </Card>
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog
+        open={showCreate}
+        onOpenChange={(open) => {
+          setShowCreate(open);
+          if (!open) {
+            stopCamera();
+            setShowCameraDialog(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>New Pawn Transaction</DialogTitle></DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
@@ -872,16 +941,22 @@ export default function Transactions() {
               </Label>
               <p className="text-xs text-muted-foreground mb-3">Upload images of the gold item from different angles</p>
 
-              <div className="flex gap-2 mb-3">
+              <div className="flex gap-2 mb-3 items-center">
                 <Input
+                  ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   multiple
                   onChange={handleImageUpload}
-                  disabled={uploadingImages}
-                  className="flex-1"
+                  className="hidden"
                 />
-                <span className="text-xs text-muted-foreground py-2">{uploadedImages.length} image(s) selected</span>
+                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                  <ImageIcon className="h-4 w-4 mr-1" />Upload
+                </Button>
+                <Button type="button" variant="outline" onClick={openCamera}>
+                  <Camera className="h-4 w-4 mr-1" />Camera
+                </Button>
+                <span className="text-xs text-muted-foreground py-2">{imagePreviews.length} image(s) selected</span>
               </div>
 
               {/* Image Previews */}
@@ -911,6 +986,55 @@ export default function Transactions() {
 
             <Button type="submit" className="w-full" disabled={loading}>{loading ? "Creating..." : "Create Transaction"}</Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showCameraDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            stopCamera();
+          }
+          setShowCameraDialog(open);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="h-4 w-4" /> Capture Photo
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center gap-4 py-2">
+            {cameraError ? (
+              <div className="w-full rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700 text-center">
+                <p className="font-semibold mb-1">Camera unavailable</p>
+                <p>{cameraError}</p>
+              </div>
+            ) : (
+              <div className="w-full rounded-lg overflow-hidden bg-black border">
+                <video ref={videoRef} autoPlay playsInline muted className="w-full max-h-72 object-cover" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                stopCamera();
+                setShowCameraDialog(false);
+              }}
+            >
+              Cancel
+            </Button>
+            {!cameraError && (
+              <Button type="button" onClick={capturePhoto}>
+                <Camera className="h-4 w-4 mr-1" />Capture
+              </Button>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

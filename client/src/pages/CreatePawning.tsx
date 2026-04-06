@@ -123,10 +123,10 @@ export default function CreatePawning() {
       setItemTypes(data || []);
 
       if (data && data.length > 0) {
-        toast({
-          title: "Item Types Loaded",
-          description: `${data.length} item types loaded from database`,
-        });
+        // toast({
+        //   title: "Item Types Loaded",
+        //   description: `${data.length} item types loaded from database`,
+        // });
       }
     } catch (error: any) {
       console.error("❌ Failed to fetch item types:", error);

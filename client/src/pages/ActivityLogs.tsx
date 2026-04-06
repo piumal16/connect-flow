@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AdvancedSearchPanel, type FilterValue } from "@/components/ui/AdvancedSearchPanel";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { apiClient } from "@/integrations/api";
 import { format } from "date-fns";
@@ -25,7 +26,7 @@ interface ActivityLogEntry {
 
 export default function ActivityLogs() {
   const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
   const [filterUserName, setFilterUserName] = useState("");
@@ -71,13 +72,15 @@ export default function ActivityLogs() {
 
   return (
     <div className="space-y-6">
+      <LoadingOverlay isLoading={loading} message="Loading activity logs..." />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Activity Logs</h1>
           <p className="text-sm text-muted-foreground">Track all user actions across the system</p>
         </div>
-        <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+        <Button variant="outline" onClick={() => setShowFilters(!showFilters)} disabled={loading}>
           <Filter className="mr-2 h-4 w-4" />
           Filters
           {hasActiveFilters && (
@@ -122,7 +125,7 @@ export default function ActivityLogs() {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Loading...
+                    Loading activity logs...
                   </TableCell>
                 </TableRow>
               ) : logs.length === 0 ? (
@@ -189,6 +192,7 @@ export default function ActivityLogs() {
               <Select
                 value={String(pageSize)}
                 onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(0); }}
+                disabled={loading}
               >
                 <SelectTrigger className="w-16 h-8">
                   <SelectValue />
@@ -207,7 +211,7 @@ export default function ActivityLogs() {
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-                disabled={currentPage === 0}
+                disabled={loading || currentPage === 0}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -216,7 +220,7 @@ export default function ActivityLogs() {
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
-                disabled={currentPage >= totalPages - 1 || totalPages === 0}
+                disabled={loading || currentPage >= totalPages - 1 || totalPages === 0}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

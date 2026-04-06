@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Plus, Power, Star } from "lucide-react";
 import apiClient from "@/integrations/api";
 
@@ -23,6 +24,7 @@ type InterestRate = {
 
 export default function InterestRates() {
   const [rates, setRates] = useState<InterestRate[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [name, setName] = useState("");
   const [ratePercent, setRatePercent] = useState("");
@@ -41,23 +43,26 @@ export default function InterestRates() {
     [activeRates, targetDeactivateRate]
   );
 
-  const fetchRates = async () => {
+  const fetchRates = useCallback(async () => {
     try {
+      setLoading(true);
       const data = await apiClient.interestRates.getAll();
       setRates(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch interest rates:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch interest rates",
+        description: error instanceof Error ? error.message : "Failed to fetch interest rates",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
-    fetchRates();
-  }, []);
+    void fetchRates();
+  }, [fetchRates]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +77,7 @@ export default function InterestRates() {
     }
 
     try {
+      setLoading(true);
       const shouldBeDefault = activeRates.length === 0 ? true : isDefault;
       await apiClient.interestRates.create({
         name,
@@ -93,18 +99,21 @@ export default function InterestRates() {
       setRatePercent("");
       setFirstMonthRatePercent("");
       setIsDefault(false);
-      fetchRates();
-    } catch (error: any) {
+      await fetchRates();
+    } catch (error: unknown) {
       console.error("Error creating interest rate:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create interest rate",
+        description: error instanceof Error ? error.message : "Failed to create interest rate",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const toggleActive = async (rate: InterestRate) => {
+    setLoading(true);
     try {
       if (rate.isActive && rate.isDefault) {
         if (replacementCandidates.length === 0) {
@@ -115,6 +124,7 @@ export default function InterestRates() {
           });
           return;
         }
+
         setTargetDeactivateRate(rate);
         setReplacementDefaultRateId("");
         setShowReplaceDialog(true);
@@ -126,13 +136,15 @@ export default function InterestRates() {
         title: "Success",
         description: `Interest rate ${rate.isActive ? "deactivated" : "activated"} successfully`,
       });
-      fetchRates();
-    } catch (error: any) {
+      await fetchRates();
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to update interest rate status",
+        description: error instanceof Error ? error.message : "Failed to update interest rate status",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -155,6 +167,7 @@ export default function InterestRates() {
     }
 
     try {
+      setLoading(true);
       await apiClient.interestRates.update(rate.id, {
         name: rate.name,
         ratePercent: rate.ratePercent,
@@ -167,13 +180,15 @@ export default function InterestRates() {
         title: "Success",
         description: `${rate.name} is now the default rate`,
       });
-      fetchRates();
-    } catch (error: any) {
+      await fetchRates();
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to set default rate",
+        description: error instanceof Error ? error.message : "Failed to set default rate",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -188,6 +203,7 @@ export default function InterestRates() {
     }
 
     try {
+      setLoading(true);
       await apiClient.interestRates.toggleActive(targetDeactivateRate.id, replacementDefaultRateId);
       toast({
         title: "Success",
@@ -196,21 +212,25 @@ export default function InterestRates() {
       setShowReplaceDialog(false);
       setTargetDeactivateRate(null);
       setReplacementDefaultRateId("");
-      fetchRates();
-    } catch (error: any) {
+      await fetchRates();
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to deactivate default rate",
+        description: error instanceof Error ? error.message : "Failed to deactivate default rate",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="space-y-6">
+      <LoadingOverlay isLoading={loading} message="Loading interest rates..." />
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Interest Rate Management</h1>
-        <Button onClick={() => setShowDialog(true)}><Plus className="mr-2 h-4 w-4" /> Add Rate</Button>
+        <Button onClick={() => setShowDialog(true)} disabled={loading}><Plus className="mr-2 h-4 w-4" /> Add Rate</Button>
       </div>
 
       <Card>
@@ -244,6 +264,7 @@ export default function InterestRates() {
                         size="sm"
                         variant="outline"
                         onClick={() => toggleActive(r)}
+                        disabled={loading}
                         title={r.isActive ? "Deactivate" : "Activate"}
                       >
                         <Power className="h-3 w-3" />
@@ -252,7 +273,7 @@ export default function InterestRates() {
                         size="sm"
                         variant="outline"
                         onClick={() => setAsDefault(r)}
-                        disabled={!r.isActive || r.isDefault}
+                        disabled={loading || !r.isActive || r.isDefault}
                         title="Set as default"
                       >
                         <Star className={`h-3 w-3 ${r.isDefault ? "fill-yellow-500 text-yellow-500" : ""}`} />
@@ -264,7 +285,7 @@ export default function InterestRates() {
               {rates.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    No interest rates found
+                    {loading ? "Loading interest rates..." : "No interest rates found"}
                   </TableCell>
                 </TableRow>
               )}
@@ -286,11 +307,11 @@ export default function InterestRates() {
           <form onSubmit={handleAdd} className="space-y-4">
             <div>
               <Label>Rate Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Standard Rate" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Standard Rate" disabled={loading} />
             </div>
             <div>
               <Label>Rate (%)</Label>
-              <Input type="number" step="0.01" value={ratePercent} onChange={(e) => setRatePercent(e.target.value)} required />
+              <Input type="number" step="0.01" value={ratePercent} onChange={(e) => setRatePercent(e.target.value)} required disabled={loading} />
             </div>
             <div>
               <Label>First Month Rate (%)</Label>
@@ -300,17 +321,18 @@ export default function InterestRates() {
                 value={firstMonthRatePercent}
                 onChange={(e) => setFirstMonthRatePercent(e.target.value)}
                 placeholder="Defaults to Rate / 12"
+                disabled={loading}
               />
             </div>
 
             {activeRates.length > 0 && (
               <div className="flex items-center space-x-2">
-                <Checkbox id="set-default" checked={isDefault} onCheckedChange={(v) => setIsDefault(!!v)} />
+                <Checkbox id="set-default" checked={isDefault} onCheckedChange={(v) => setIsDefault(!!v)} disabled={loading} />
                 <Label htmlFor="set-default">Set as default active rate</Label>
               </div>
             )}
 
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={loading}>
               Create Rate
             </Button>
           </form>
@@ -329,7 +351,7 @@ export default function InterestRates() {
           <div className="space-y-4">
             <div>
               <Label>New Default Rate</Label>
-              <Select value={replacementDefaultRateId} onValueChange={setReplacementDefaultRateId}>
+              <Select value={replacementDefaultRateId} onValueChange={setReplacementDefaultRateId} disabled={loading}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select replacement default rate" />
                 </SelectTrigger>
@@ -351,10 +373,11 @@ export default function InterestRates() {
                   setTargetDeactivateRate(null);
                   setReplacementDefaultRateId("");
                 }}
+                disabled={loading}
               >
                 Cancel
               </Button>
-              <Button onClick={confirmDeactivateDefault}>Confirm</Button>
+              <Button onClick={confirmDeactivateDefault} disabled={loading}>Confirm</Button>
             </div>
           </div>
         </DialogContent>

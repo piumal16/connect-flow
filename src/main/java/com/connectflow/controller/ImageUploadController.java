@@ -1,6 +1,8 @@
 package com.connectflow.controller;
 
 import com.connectflow.service.ImageUploadService;
+import com.connectflow.service.ImageMigrationService;
+import com.connectflow.service.ImageMigrationService.MigrationResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import java.util.Map;
 public class ImageUploadController {
 
     private final ImageUploadService imageUploadService;
+    private final ImageMigrationService imageMigrationService;
 
     @PostMapping("/upload")
     @Operation(summary = "Upload single image")
@@ -116,5 +119,35 @@ public class ImageUploadController {
         response.put("uploadDir", imageUploadService.getUploadDir());
         return ResponseEntity.ok(response);
     }
-}
 
+    @PostMapping("/migrate-base64")
+    @Operation(summary = "Migrate existing Base64 images to Cloudinary (admin only)")
+    public ResponseEntity<Map<String, Object>> migrateBase64Images() {
+        try {
+            log.info("Starting Base64 to Cloudinary migration...");
+
+            MigrationResult result = imageMigrationService.migrateAllBase64Images();
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", result.isSuccess() ? "success" : "partial");
+            response.put("totalFound", result.getTotalFound());
+            response.put("successful", result.getSuccessful());
+            response.put("failed", result.getFailed());
+            if (!result.getErrors().isEmpty()) {
+                response.put("errors", result.getErrors());
+            }
+            if (result.getFatalError() != null) {
+                response.put("fatalError", result.getFatalError());
+            }
+
+            return result.isSuccess() ? ResponseEntity.ok(response) : ResponseEntity.status(HttpStatus.PARTIAL_CONTENT).body(response);
+
+        } catch (Exception e) {
+            log.error("Migration failed", e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", "error");
+            error.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+}

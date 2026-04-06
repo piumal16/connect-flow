@@ -11,15 +11,12 @@ export function AdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [managers, staff] = await Promise.all([
-          apiClient.users.getByRole("MANAGER"),
-          apiClient.users.getByRole("STAFF"),
-        ]);
+        const response = await apiClient.users.getAdminDashboardStats();
         setStats({
-          managers: managers.length || 0,
-          totalStaff: staff.length || 0,
-          activePawns: 0,
-          activeRates: 0,
+          managers: response.managers || 0,
+          totalStaff: response.totalStaff || 0,
+          activePawns: response.activePawns || 0,
+          activeRates: response.activeRates || 0,
         });
       } catch (error) {
         setStats({ managers: 0, totalStaff: 0, activePawns: 0, activeRates: 0 });

@@ -3,7 +3,7 @@
  * Handles all HTTP requests to the Spring Boot backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://connect-flow.railway.internal/api';
 
 const authFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const headers = new Headers(init.headers || {});
@@ -113,6 +113,16 @@ export const apiClient = {
     getByBranch: async (branchId: string) => {
       const response = await authFetch(`${API_BASE_URL}/users/branch/${branchId}`);
       if (!response.ok) throw new Error('Failed to fetch users by branch');
+      return response.json();
+    },
+    getAdminDashboardStats: async () => {
+      const response = await authFetch(`${API_BASE_URL}/users/dashboard-stats/admin`);
+      if (!response.ok) throw new Error('Failed to fetch admin dashboard stats');
+      return response.json();
+    },
+    getSuperAdminDashboardStats: async () => {
+      const response = await authFetch(`${API_BASE_URL}/users/dashboard-stats/super-admin`);
+      if (!response.ok) throw new Error('Failed to fetch super admin dashboard stats');
       return response.json();
     },
     create: async (data: any) => {
